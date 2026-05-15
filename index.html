@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Solitaire Pro V12</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <style>
+        :root {
+            --bg: #f0fdf4;
+            --primary: #15803d;
+            --card-w: 80px;
+            --card-h: 115px;
+            --v-offset: 32px;
+            --safe-top: env(safe-area-inset-top);
+        }
+
+        @media (max-width: 600px) {
+            :root {
+                --card-w: 48px;
+                --card-h: 70px;
+                --v-offset: 18px;
+            }
+            .board { gap: 6px !important; }
+            .card-header { font-size: 11px !important; gap: 2px !important; }
+            .card-main-suit { font-size: 24px !important; }
+            header h1 { font-size: 1rem !important; }
+        }
+
+        * {
+            box-sizing: border-box; margin: 0; padding: 0;
+            -webkit-touch-callout: none; -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        header {
+            width: 100%; padding: calc(var(--safe-top) + 10px) 20px 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: white; z-index: 1000; box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+        }
+
+        .stats { display: flex; gap: 15px; font-weight: 700; font-size: 0.9rem; }
+
+        .game-area {
+            flex: 1; padding: 20px 10px; display: flex; flex-direction: column; gap: 25px;
+            position: relative; align-items: center;
+        }
+
+        .board { display: grid; grid-template-columns: repeat(7, var(--card-w)); gap: 15px; justify-content: center; }
+
+        .slot {
+            width: var(--card-w); height: var(--card-h);
+            border-radius: 6px; background: rgba(0,0,0,0.04);
+            border: 1px dashed rgba(21, 128, 61, 0.2); position: relative;
+        }
+
+        .card {
+            width: var(--card-w); height: var(--card-h);
+            background: white; border-radius: 6px;
+            position: absolute; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column; padding: 4px;
+            border: 0.5px solid #e2e8f0;
+        }
+
+        .card-header { display: flex; align-items: center; gap: 4px; font-weight: 900; font-size: 16px; }
+        .card.red { color: #dc2626; }
+        .card.black { color: #1e293b; }
+        .card-main-suit { flex: 1; display: flex; justify-content: center; align-items: center; font-size: 38px; }
+
+        .card.back {
+            background: linear-gradient(135deg, #166534, #15803d);
+            border: 2px solid white;
+            background-image: radial-gradient(circle, rgba(255,255,255,0.1) 0.5px, transparent 0.5px);
+            background-size: 8px 8px;
+        }
+
+        .controls { padding-bottom: calc(env(safe-area-inset-bottom) + 20px); display: flex; gap: 10px; justify-content: center; }
+        button {
+            padding: 10px 20px; border-radius: 20px; border: none;
+            background: var(--primary); color: white; font-weight: 700; font-size: 0.8rem;
+        }
+        button.sec { background: white; color: var(--primary); border: 1px solid #ddd; }
+
+        .dragging { z-index: 5000 !important; box-shadow: 0 15px 30px rgba(0,0,0,0.2) !important; opacity: 0.9; }
+
+        .win-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(6, 78, 59, 0.98); display: none;
+            flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9999; color: white; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 style="font-weight: 900; font-size: 1.1rem;">SOLITAIRE V12</h1>
+    <div class="stats">
+        <span>SCORE: <span id="score">0</span></span>
+        <span>MOVES: <span id="moves">0</span></span>
+    </div>
+    <div style="display: flex; gap: 5px;">
+        <button class="sec" style="padding: 5px 12px" onclick="game.undo()">UNDO</button>
+    </div>
+</header>
+
+<div class="game-area">
+    <div class="board">
+        <div id="stock" class="slot" onclick="game.draw()"></div>
+        <div id="waste" class="slot"></div>
+        <div class="spacer"></div>
+        <div id="f0" class="slot"></div>
+        <div id="f1" class="slot"></div>
+        <div id="f2" class="slot"></div>
+        <div id="f3" class="slot"></div>
+    </div>
+
+    <div class="board">
+        <div id="t0" class="slot"></div>
+        <div id="t1" class="slot"></div>
+        <div id="t2" class="slot"></div>
+        <div id="t3" class="slot"></div>
+        <div id="t4" class="slot"></div>
+        <div id="t5" class="slot"></div>
+        <div id="t6" class="slot"></div>
+    </div>
+</div>
+
+<div class="controls">
+    <button onclick="game.init(true)">NEW GAME</button>
+    <button class="sec" onclick="game.init(false)">RESTART</button>
+</div>
+
+<div id="win" class="win-overlay">
+    <h1 style="font-size: 3rem; margin-bottom: 10px;">VICTORY!</h1>
+    <p id="winMsg" style="margin-bottom: 20px;">Well Played.</p>
+    <button onclick="location.reload()" style="padding: 15px 40px;">PLAY AGAIN</button>
+</div>
+
+<script>
+const SUITS = [
+    { name: 'hearts', sym: '♥', color: 'red' },
+    { name: 'diamonds', sym: '♦', color: 'red' },
+    { name: 'spades', sym: '♠', color: 'black' },
+    { name: 'clubs', sym: '♣', color: 'black' }
+];
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+class Card {
+    constructor(suit, rank, faceUp = false) {
+        this.suit = suit; this.rank = rank;
+        this.val = RANKS.indexOf(rank) + 1;
+        this.faceUp = faceUp;
+        this.id = 'c_' + Math.random().toString(36).substr(2, 9);
+    }
+}
+
+const game = {
+    piles: {}, initial: null, history: [], score: 0, moves: 0,
+    dragGroup: [], dragOffset: { x: 0, y: 0 }, isDragging: false, autoSolving: false,
+
+    init(isNew) {
+        document.getElementById('win').style.display = 'none';
+        this.autoSolving = false;
+        let deck = [];
+        for (let s of SUITS) for (let r of RANKS) deck.push(new Card(s, r));
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+
+        if (isNew || !this.initial) {
+            let p = { stock: [], waste: [], foundations: [[],[],[],[]], tableau: [[],[],[],[],[],[],[]] };
+            let idx = 0;
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j <= i; j++) {
+                    let c = deck[idx++];
+                    if (j === i) c.faceUp = true;
+                    p.tableau[i].push(c);
+                }
+            }
+            p.stock = deck.slice(idx);
+            this.initial = JSON.stringify(p);
+        }
+        this.apply(JSON.parse(this.initial), 0, 0, true);
+    },
+
+    apply(p, s, m, full) {
+        this.piles = p; this.score = s; this.moves = m;
+        if (full) this.history = [];
+        this.render();
+        if (full) gsap.from('.card', { y: -100, opacity: 0, stagger: 0.01, duration: 0.4 });
+    },
+
+    render() {
+        document.querySelectorAll('.slot').forEach(s => s.innerHTML = '');
+        this.renderPile('stock', this.piles.stock);
+        this.renderPile('waste', this.piles.waste);
+        this.piles.foundations.forEach((f, i) => this.renderPile(`f${i}`, f));
+        this.piles.tableau.forEach((t, i) => this.renderPile(`t${i}`, t));
+        document.getElementById('score').innerText = this.score;
+        document.getElementById('moves').innerText = this.moves;
+        
+        if (!this.autoSolving) this.checkAutoWinCondition();
+    },
+
+    renderPile(pid, cards) {
+        const slot = document.getElementById(pid);
+        const offset = window.innerWidth <= 600 ? 18 : 32;
+
+        cards.forEach((c, i) => {
+            const el = document.createElement('div');
+            el.className = `card ${c.faceUp ? c.suit.color : 'back'}`;
+            el.id = c.id;
+            if (c.faceUp) {
+                el.innerHTML = `<div class="card-header"><span>${c.rank}</span><span>${c.suit.sym}</span></div><div class="card-main-suit">${c.suit.sym}</div>`;
+                
+                const start = (e) => {
+                    if (this.autoSolving) return;
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    this.startDrag(clientX, clientY, pid, i);
+                    if(e.cancelable) e.preventDefault();
+                };
+                el.onmousedown = start;
+                el.ontouchstart = start;
+            }
+            if (pid.startsWith('t')) { el.style.top = (i * offset) + 'px'; el.style.zIndex = i; }
+            else { el.style.zIndex = i; }
+            slot.appendChild(el);
+        });
+    },
+
+    startDrag(x, y, pid, idx) {
+        const pile = this.getArr(pid);
+        this.dragGroup = pile.slice(idx).map(c => ({ card: c, el: document.getElementById(c.id) }));
+        this.dragSourceId = pid;
+        this.isDragging = true;
+        const rect = this.dragGroup[0].el.getBoundingClientRect();
+        this.dragOffset = { x: x - rect.left, y: y - rect.top };
+        this.dragGroup.forEach(item => item.el.classList.add('dragging'));
+
+        const move = (e) => {
+            const cx = e.touches ? e.touches[0].clientX : e.clientX;
+            const cy = e.touches ? e.touches[0].clientY : e.clientY;
+            this.onMove(cx, cy);
+        };
+        const end = (e) => {
+            const cx = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+            const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+            window.removeEventListener('mousemove', move);
+            window.removeEventListener('mouseup', end);
+            window.removeEventListener('touchmove', move);
+            window.removeEventListener('touchend', end);
+            this.stopDrag(cx, cy);
+        };
+        window.addEventListener('mousemove', move, {passive: false});
+        window.addEventListener('mouseup', end);
+        window.addEventListener('touchmove', move, {passive: false});
+        window.addEventListener('touchend', end);
+    },
+
+    onMove(x, y) {
+        if (!this.isDragging) return;
+        const offset = window.innerWidth <= 600 ? 18 : 32;
+        this.dragGroup.forEach((item, i) => {
+            item.el.style.position = 'fixed';
+            item.el.style.left = (x - this.dragOffset.x) + 'px';
+            item.el.style.top = (y - this.dragOffset.y + i * offset) + 'px';
+        });
+    },
+
+    stopDrag(x, y) {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+        const firstEl = this.dragGroup[0].el;
+        firstEl.style.display = 'none';
+        const target = document.elementFromPoint(x, y);
+        firstEl.style.display = 'flex';
+        let tid = target ? target.closest('.slot')?.id : null;
+        if (tid && this.isValid(this.dragGroup[0].card, tid)) {
+            this.save();
+            let from = this.getArr(this.dragSourceId);
+            let to = this.getArr(tid);
+            from.splice(from.length - this.dragGroup.length);
+            to.push(...this.dragGroup.map(i => i.card));
+            if (from.length > 0) from[from.length-1].faceUp = true;
+            this.moves++; this.score += 10;
+        }
+        this.render();
+    },
+
+    isValid(c, tid) {
+        if (tid === this.dragSourceId) return false;
+        const tArr = this.getArr(tid);
+        const top = tArr[tArr.length - 1];
+        if (tid.startsWith('t')) {
+            if (!top) return c.rank === 'K';
+            return top.suit.color !== c.suit.color && top.val === c.val + 1;
+        }
+        if (tid.startsWith('f')) {
+            if (this.dragGroup.length > 1) return false;
+            if (!top) return c.rank === 'A';
+            return top.suit.name === c.suit.name && c.val === top.val + 1;
+        }
+        return false;
+    },
+
+    checkAutoWinCondition() {
+        // Condition: No cards left in Stock/Waste AND all Tableau cards are face up.
+        const allFaceUp = this.piles.tableau.every(t => t.every(c => c.faceUp));
+        const emptyStockWaste = this.piles.stock.length === 0 && this.piles.waste.length === 0;
+        
+        if (allFaceUp && emptyStockWaste) {
+            // Foundational total cards check: if not all 52 cards are in foundations, start auto-collect.
+            const foundationsCount = this.piles.foundations.reduce((acc, f) => acc + f.length, 0);
+            if (foundationsCount < 52) {
+                this.autoSolve();
+            }
+        }
+    },
+
+    async autoSolve() {
+        this.autoSolving = true;
+        let movedThisTurn = true;
+
+        while (movedThisTurn) {
+            movedThisTurn = false;
+            // Scan tableau for cards that can go to foundations
+            for (let i = 0; i < 7; i++) {
+                let col = this.piles.tableau[i];
+                if (col.length > 0) {
+                    let card = col[col.length - 1];
+                    for (let j = 0; j < 4; j++) {
+                        let f = this.piles.foundations[j];
+                        let fTop = f[f.length - 1];
+                        if ((!fTop && card.rank === 'A') || (fTop && fTop.suit.name === card.suit.name && card.val === fTop.val + 1)) {
+                            // Move card
+                            f.push(col.pop());
+                            this.score += 10;
+                            this.render();
+                            await new Promise(r => setTimeout(r, 100)); // Animation delay
+                            movedThisTurn = true;
+                            break;
+                        }
+                    }
+                }
+                if (movedThisTurn) break;
+            }
+        }
+
+        if (this.piles.foundations.every(f => f.length === 13)) {
+            document.getElementById('win').style.display = 'flex';
+            gsap.to('.card', { x: "random(-500,500)", y: 1000, rotation: 720, duration: 2, stagger: 0.02 });
+        }
+    },
+
+    draw() {
+        if (this.autoSolving) return;
+        this.save();
+        if (this.piles.stock.length === 0) {
+            this.piles.stock = this.piles.waste.reverse().map(c => {c.faceUp = false; return c;});
+            this.piles.waste = [];
+        } else {
+            let c = this.piles.stock.pop(); c.faceUp = true; this.piles.waste.push(c);
+        }
+        this.moves++; this.render();
+    },
+
+    getArr(id) {
+        if (id === 'stock') return this.piles.stock;
+        if (id === 'waste') return this.piles.waste;
+        if (id.startsWith('f')) return this.piles.foundations[id[1]];
+        if (id.startsWith('t')) return this.piles.tableau[id[1]];
+    },
+
+    save() { this.history.push({ state: JSON.stringify(this.piles), score: this.score, moves: this.moves }); },
+    undo() {
+        if (this.autoSolving || this.history.length === 0) return;
+        const l = this.history.pop(); this.apply(JSON.parse(l.state), l.score, l.moves, false);
+    }
+};
+
+game.init(true);
+</script>
+</body>
+</html>
